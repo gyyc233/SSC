@@ -1,4 +1,5 @@
 {
+    "editor.wordWrap": "on",
     "files.associations": {
         "cctype": "cpp",
         "clocale": "cpp",

@@ -17,7 +17,7 @@ SSC::SSC(std::string conf_file)
     random_generator.reset(new std::default_random_engine(time_t.tv_usec));
     random_distribution.reset(new std::uniform_int_distribution<int>(-18000, 18000));
 
-    // 将 learning_map 中的对应关系存入 label_map 数组
+    // 将 learning_map 中的原始语义标签映射到新的语义标签
     learning_map = data_cfg["learning_map"];
     label_map.resize(260);
     for (auto it = learning_map.begin(); it != learning_map.end(); ++it)
@@ -27,7 +27,7 @@ SSC::SSC(std::string conf_file)
 
 
     YAML::const_iterator it;
-    // 读取每个语义标签对应的 RGB 颜色
+    // 读取每个语义标签对应的 RGB 颜色，可以按照原始语义标签查找颜色
     auto color_map = data_cfg["color_map"]; // 每个语义标签对应的rgb颜色映射
     for (it = color_map.begin(); it != color_map.end(); ++it)
     {
@@ -55,41 +55,56 @@ SSC::~SSC()
 
 pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std::string file_label)
 {
-    pcl::PointCloud<pcl::PointXYZL>::Ptr re_cloud(new pcl::PointCloud<pcl::PointXYZL>());
-    std::ifstream in_label(file_label, std::ios::binary);
+    pcl::PointCloud<pcl::PointXYZL>::Ptr re_cloud(new pcl::PointCloud<pcl::PointXYZL>()); // 新建空的带语义标签点云
+
+    // 打开标签文件
+    std::ifstream in_label(file_label, std::ios::binary); 
     if (!in_label.is_open())
     {
         std::cerr << "No file:" << file_label << std::endl;
         exit(-1);
     }
+
     in_label.seekg(0, std::ios::end);
-    uint32_t num_points = in_label.tellg() / sizeof(uint32_t);
+    uint32_t num_points = in_label.tellg() / sizeof(uint32_t); // 标签文件大小/uint32_t大小 = 点云数量
     in_label.seekg(0, std::ios::beg);
     std::vector<uint32_t> values_label(num_points);
-    in_label.read((char *)&values_label[0], num_points * sizeof(uint32_t));
+    in_label.read((char *)&values_label[0], num_points * sizeof(uint32_t)); // 把整份标签读取到values_label中
+
+    // 打开点云文件
     std::ifstream in_cloud(file_cloud, std::ios::binary);
     std::vector<float> values_cloud(4 * num_points);
+    // 按点云每点 4 个 float 把整帧读进 values_cloud
     in_cloud.read((char *)&values_cloud[0], 4 * num_points * sizeof(float));
+    
+    // re_cloud 的点数设为 num_points，后面按索引往里填坐标和标签
     re_cloud->points.resize(num_points);
+
     float random_angle = 0, max_angle = 0;
     float cs = 1, ss = 0;
     if (rotate || occlusion)
     {
+        // 随机生成一个扇形区域的旋转角度 [random_angle,random_angle+M_PI/6]
         random_angle = (*random_distribution)(*random_generator) * M_PI / 18000.0;
         max_angle = random_angle + M_PI / 6.;
+
         cs = cos(random_angle);
         ss = sin(random_angle);
     }
+
     for (uint32_t i = 0; i < num_points; ++i)
     {
         if (occlusion)
         {
+            // 若点云点落在扇形中视为遮挡，跳过
             float theta = atan2(values_cloud[4 * i + 1], values_cloud[4 * i]);
             if (theta > random_angle && theta < max_angle)
             {
                 continue;
             }
         }
+
+        // 重映射语义标签 remap 时用 label_map[低16位]，否则用原始 values_label[i]
         uint32_t sem_label;
         if (remap)
         {
@@ -99,6 +114,8 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
         {
             sem_label = values_label[i];
         }
+
+        // 若 sem_label == 0（未标注），把该点写成 (0,0,0)、label=0，然后 continue
         if (sem_label == 0)
         {
             re_cloud->points[i].x = 0;
@@ -107,6 +124,8 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
             re_cloud->points[i].label = 0;
             continue;
         }
+
+        // 若开启 rotate，用之前的 cos/sin 对当前点做绕 Z 轴旋转写 xy；否则直接抄原始 x、y
         if (rotate)
         {
             re_cloud->points[i].x = values_cloud[4 * i] * cs - values_cloud[4 * i + 1] * ss;
@@ -117,21 +136,22 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
             re_cloud->points[i].x = values_cloud[4 * i];
             re_cloud->points[i].y = values_cloud[4 * i + 1];
         }
+
+        // 抄原始 z 和 label
         re_cloud->points[i].z = values_cloud[4 * i + 2];
         re_cloud->points[i].label = sem_label;
     }
-    in_label.close();
-    in_cloud.close();
     return re_cloud;
 }
 
 pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud)
 {
+    // 加载带标签的点云
     pcl::PointCloud<pcl::PointXYZL>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZL>);
-    if (pcl::io::loadPCDFile<pcl::PointXYZL>(file_cloud, *cloud) == -1) //* load the file
+    if (pcl::io::loadPCDFile<pcl::PointXYZL>(file_cloud, *cloud) == -1)
     {
-        PCL_ERROR("Couldn't read file test_pcd.pcd \n");
-        return NULL;
+        PCL_ERROR("Couldn't read file %s\n", file_cloud.c_str());
+        return nullptr;
     }
     return cloud;
 }
@@ -142,6 +162,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr SSC::getColorCloud(pcl::PointCloud<pcl::P
     outcloud->points.resize(cloud_in->points.size());
     for (size_t i = 0; i < outcloud->points.size(); i++)
     {
+        // 按每个点的语义设置颜色
         outcloud->points[i].x = cloud_in->points[i].x;
         outcloud->points[i].y = cloud_in->points[i].y;
         outcloud->points[i].z = cloud_in->points[i].z;
@@ -156,11 +177,15 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr SSC::getColorCloud(pcl::PointCloud<pcl::P
 
 cv::Mat SSC::project(pcl::PointCloud<pcl::PointXYZL>::Ptr filtered_pointcloud)
 {
-    auto sector_step = 2. * M_PI / sectors_range;
+    auto sector_step = 2. * M_PI / sectors_range; // 把圆均分成 sectors_range 个扇区
+
+    // 新建一个 sectors_range x 1 的矩阵，用于存储每个扇区的距离、x、y、语义标签
     cv::Mat ssc_dis = cv::Mat::zeros(cv::Size(sectors_range, 1), CV_32FC4);
+
     for (uint i = 0; i < filtered_pointcloud->points.size(); i++)
     {
         auto label = filtered_pointcloud->points[i].label;
+        // 只保留 label 为 13, 14, 16, 18, 19 的点对应 building, fence栅栏, pole电线杆, truck, traffic-sign交通标志
         if (label == 13 || label == 14 || label == 16 || label == 18 || label == 19)
         {
             float distance = std::sqrt(filtered_pointcloud->points[i].x * filtered_pointcloud->points[i].x + filtered_pointcloud->points[i].y * filtered_pointcloud->points[i].y);
@@ -169,16 +194,20 @@ cv::Mat SSC::project(pcl::PointCloud<pcl::PointXYZL>::Ptr filtered_pointcloud)
                 continue;
             }
             // int sector_id = cv::fastAtan2(filtered_pointcloud->points[i].y, filtered_pointcloud->points[i].x);
+            // atan2(y,x) 返回的是 [-π,π] 之间的弧度值，表示点 (x,y) 相对于原点 (0,0) 的方位角
             float angle = M_PI + std::atan2(filtered_pointcloud->points[i].y, filtered_pointcloud->points[i].x);
-            int sector_id = std::floor(angle / sector_step);
+            int sector_id = std::floor(angle / sector_step); // 将弧度值转换为扇区索引
             if (sector_id >= sectors_range || sector_id < 0)
                 continue;
-            // if(ssc_dis.at<cv::Vec4f>(0, sector_id)[3]<10||distance<ssc_dis.at<cv::Vec4f>(0, sector_id)[0]){
-            ssc_dis.at<cv::Vec4f>(0, sector_id)[0] = distance;
-            ssc_dis.at<cv::Vec4f>(0, sector_id)[1] = filtered_pointcloud->points[i].x;
-            ssc_dis.at<cv::Vec4f>(0, sector_id)[2] = filtered_pointcloud->points[i].y;
-            ssc_dis.at<cv::Vec4f>(0, sector_id)[3] = label;
-            // }
+            // 仅当该扇区为空或当前点更近时才覆盖，使每扇区保留“最近点”，结果稳定且与遍历顺序无关
+            float old_dis = ssc_dis.at<cv::Vec4f>(0, sector_id)[0];
+            if (old_dis < 1e-6f || distance < old_dis)
+            {
+                ssc_dis.at<cv::Vec4f>(0, sector_id)[0] = distance;
+                ssc_dis.at<cv::Vec4f>(0, sector_id)[1] = filtered_pointcloud->points[i].x;
+                ssc_dis.at<cv::Vec4f>(0, sector_id)[2] = filtered_pointcloud->points[i].y;
+                ssc_dis.at<cv::Vec4f>(0, sector_id)[3] = label;
+            }
         }
     }
     return ssc_dis;
@@ -186,9 +215,9 @@ cv::Mat SSC::project(pcl::PointCloud<pcl::PointXYZL>::Ptr filtered_pointcloud)
 
 cv::Mat SSC::calculateSSC(pcl::PointCloud<pcl::PointXYZL>::Ptr filtered_pointcloud)
 {
-    auto ring_step = (max_dis - min_dis) / rings;
-    auto sector_step = 360. / sectors;
-    cv::Mat ssc = cv::Mat::zeros(cv::Size(sectors, rings), CV_8U);
+    auto ring_step = (max_dis - min_dis) / rings; // 径向分割
+    auto sector_step = 360. / sectors; // 方位角分割
+    cv::Mat ssc = cv::Mat::zeros(cv::Size(sectors, rings), CV_8U); // ssc 为 rings × sectors 的 8 位图，初值为 0
     for (int i = 0; i < (int)filtered_pointcloud->points.size(); i++)
     {
         auto label = filtered_pointcloud->points[i].label;
@@ -197,12 +226,16 @@ cv::Mat SSC::calculateSSC(pcl::PointCloud<pcl::PointXYZL>::Ptr filtered_pointclo
             double distance = std::sqrt(filtered_pointcloud->points[i].x * filtered_pointcloud->points[i].x + filtered_pointcloud->points[i].y * filtered_pointcloud->points[i].y);
             if (distance >= max_dis || distance < min_dis)
                 continue;
+
+            // cv::fastAtan2[0,2π]
             int sector_id = cv::fastAtan2(filtered_pointcloud->points[i].y, filtered_pointcloud->points[i].x)/ sector_step;
             int ring_id = (distance - min_dis) / ring_step;
             if (ring_id >= rings || ring_id < 0)
                 continue;
             if (sector_id >= sectors || sector_id < 0)
                 continue;
+
+            // 若当前点的 order_vec 大于该格子已有标签的 order_vec，则用当前 label 覆盖该格子
             if (order_vec[label] > order_vec[ssc.at<unsigned char>(ring_id, sector_id)])
             {
                 ssc.at<unsigned char>(ring_id, sector_id) = label;
@@ -229,6 +262,10 @@ cv::Mat SSC::getColorImage(cv::Mat &desc)
 
 void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &diff_x, float &diff_y)
 {
+    // angle：绕 Z 轴从 frame2 到 frame1 的大概旋转角
+    // diff_x, diff_y：累计平移（米），表示把 frame2 平移多少能与 frame1 在 xy 上对齐
+
+    // 1. 粗旋转 ssc_dis1，ssc_dis2 是1维描述子
     double similarity = 100000;
     int sectors = ssc_dis1.cols;
     for (int i = 0; i < sectors; ++i)
@@ -237,20 +274,27 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
         for (int j = 0; j < sectors; ++j)
         {
             int new_col = j + i >= sectors ? j + i - sectors : j + i;
+            // ssc_dis [distance, x, y, label],只对比距离
             cv::Vec4f vec1 = ssc_dis1.at<cv::Vec4f>(0, j);
             cv::Vec4f vec2 = ssc_dis2.at<cv::Vec4f>(0, new_col);
             // if(vec1[3]==vec2[3]){
-            dis_count += fabs(vec1[0] - vec2[0]);
+            dis_count += fabs(vec1[0] - vec2[0]); // 只对比距离，
             // }
         }
+
+        // 取最小距离对应的扇区偏转作为最佳偏转角度
         if (dis_count < similarity)
         {
             similarity = dis_count;
             angle = i;
         }
     }
+
+    // 按照扇区移位计算粗略的z轴旋转角
     int angle_o = angle;
     angle = M_PI * (360. - angle * 360. / sectors) / 180.;
+
+    // 用该角对ssc_dis2的 x y 做旋转
     auto cs = cos(angle);
     auto sn = sin(angle);
     auto temp_dis1 = ssc_dis1.clone();
@@ -261,10 +305,13 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
         temp_dis2.at<cv::Vec4f>(0, i)[2] = ssc_dis2.at<cv::Vec4f>(0, i)[1] * sn + ssc_dis2.at<cv::Vec4f>(0, i)[2] * cs;
     }
 
+    // 迭代计算平移
     for (int i = 0; i < 100; ++i)
     {
         float dx = 0, dy = 0;
         int diff_count = 1;
+
+        // 对 temp_dis1 的每个有效扇区
         for (int j = 0; j < sectors; ++j)
         {
             cv::Vec4f vec1 = temp_dis1.at<cv::Vec4f>(0, j);
@@ -274,6 +321,7 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
             }
             int min_id = -1;
             float min_dis = 1000000.;
+            // 在 temp_dis2 里在 j + angle_o ± 10 扇区范围内找 xy 欧氏距离最近的一格（vec_temp[1],[2]），忽略 vec_temp[0] ≤ 0 的扇区
             for (int k = j + angle_o - 10; k < j + angle_o + 10; ++k)
             {
                 cv::Vec4f vec_temp;
@@ -302,6 +350,9 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
             {
                 continue;
             }
+
+            // 只信任已经比较接近的点对，只把“已经比较对齐”的点对当作可靠对应
+            // 若某对点当前 xy 差很大，说明可能是错误对应（最近点找错了，或该扇区本身不稳定）
             cv::Vec4f vec2 = temp_dis2.at<cv::Vec4f>(0, min_id);
             if (fabs(vec1[1] - vec2[1]) < 3 && fabs(vec1[2] - vec2[2]) < 3)
             {
@@ -310,6 +361,8 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
                 diff_count++;
             }
         }
+
+        // 计算平均偏移量
         dx = 1. * dx / diff_count;
         dy = 1. * dy / diff_count;
 
@@ -319,6 +372,7 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
         {
             if (temp_dis2.at<cv::Vec4f>(0, j)[0] != 0)
             {
+                // 把 temp_dis2 里所有有效点的 [1]、[2] 加上 (dx, dy)
                 temp_dis2.at<cv::Vec4f>(0, j)[1] += dx;
                 temp_dis2.at<cv::Vec4f>(0, j)[2] += dy;
                 if (show)
@@ -360,6 +414,8 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
         {
             std::cout << i << " diff " << diff_x << " " << diff_y << " " << dx << " " << dy << std::endl;
         }
+        
+        // 若偏移量足够小，则停止迭代
         if (fabs(dx) < 1e-5 && fabs(dy) < 1e-5)
         {
             break;
@@ -368,6 +424,7 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
 }
 
 Eigen::Matrix4f SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2){
+    // 1. 用扇区距离估计粗旋转角
     double similarity = 100000;
     float angle=0;
     int sectors = ssc_dis1.cols;
@@ -395,15 +452,20 @@ Eigen::Matrix4f SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2){
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZ>),cloud2(new pcl::PointCloud<pcl::PointXYZ>);
     for (int i = 0; i < sectors; ++i)
     {
+        // 把ssc_dis1的每个有效扇区点 x y 压入cloud1
         if(ssc_dis1.at<cv::Vec4f>(0, i)[3]>0){
             cloud1->push_back(pcl::PointXYZ(ssc_dis1.at<cv::Vec4f>(0, i)[1],ssc_dis1.at<cv::Vec4f>(0, i)[2],0.));
         }
+
+        // 把ssc_dis2的每个有效扇区点 x y 压入cloud2
         if(ssc_dis2.at<cv::Vec4f>(0, i)[3]>0){
             float tpx = ssc_dis2.at<cv::Vec4f>(0, i)[1] * cs - ssc_dis2.at<cv::Vec4f>(0, i)[2] * sn;
             float tpy = ssc_dis2.at<cv::Vec4f>(0, i)[1] * sn + ssc_dis2.at<cv::Vec4f>(0, i)[2] * cs;
             cloud2->push_back(pcl::PointXYZ(tpx,tpy,0.));
         }
     }
+
+    // 2. 用 ICP 细化旋转和平移
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
     icp.setInputSource(cloud2);
     icp.setInputTarget(cloud1);
@@ -412,7 +474,7 @@ Eigen::Matrix4f SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2){
     auto trans=icp.getFinalTransformation();
     Eigen::Affine3f trans1 = Eigen::Affine3f::Identity();
     trans1.rotate(Eigen::AngleAxisf(angle, Eigen::Vector3f::UnitZ()));
-    return trans*trans1.matrix();
+    return trans*trans1.matrix(); // 把之前的粗旋转和ICP细化旋转合并
 }
 
 double SSC::calculateSim(cv::Mat &desc1, cv::Mat &desc2)
@@ -429,16 +491,18 @@ double SSC::calculateSim(cv::Mat &desc1, cv::Mat &desc2)
             {
                 continue;
             }
-            valid_num++;
+
+            valid_num++; // 该格至少有一幅有语义，算“有效格”
 
             if (desc1.at<unsigned char>(q, p) == desc2.at<unsigned char>(q, p))
             {
+                // 语义相同
                 similarity++;
             }
         }
     }
     // std::cout<<similarity<<std::endl;
-    return similarity / valid_num;
+    return similarity / valid_num; // 有效格的语义相同比例
 }
 
 double SSC::getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointCloud<pcl::PointXYZL>::Ptr cloud2, double &angle, float &diff_x, float &diff_y)
@@ -446,21 +510,30 @@ double SSC::getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointClou
     angle = 0;
     diff_x = 0;
     diff_y = 0;
+    // 计算语义点云1维描述子
     cv::Mat ssc_dis1 = project(cloud1);
     cv::Mat ssc_dis2 = project(cloud2);
+    // 估计ssc2到ssc1的粗旋转与累计平移
     globalICP(ssc_dis1, ssc_dis2, angle, diff_x, diff_y);
+    // 若平移量太大，则认为匹配失败
     if (fabs(diff_x)>5 || fabs(diff_y) > 5)
     {
         diff_x = 0;
         diff_y = 0;
     }
+    // 把粗旋转和平移合并
     Eigen::Affine3f transform = Eigen::Affine3f::Identity();
     transform.translation() << diff_x, diff_y, 0;
     transform.rotate(Eigen::AngleAxisf(angle, Eigen::Vector3f::UnitZ()));
+
+    // 把ssc2平移到ssc1的位置
     pcl::PointCloud<pcl::PointXYZL>::Ptr trans_cloud(new pcl::PointCloud<pcl::PointXYZL>);
     transformPointCloud(*cloud2, *trans_cloud, transform);
+
+    // 计算语义点云2维描述子
     auto desc1 = calculateSSC(cloud1);
     auto desc2 = calculateSSC(trans_cloud);
+    // 计算相似度得分
     auto score = calculateSim(desc1, desc2);
     if (show)
     {
@@ -509,8 +582,10 @@ double SSC::getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointClou
 
 double SSC::getScore(std::string cloud_file1, std::string cloud_file2, std::string label_file1, std::string label_file2, double &angle, float &diff_x, float &diff_y)
 {
+    // 加载带语义标签的点云
     auto cloudl1 = getLCloud(cloud_file1, label_file1);
     auto cloudl2 = getLCloud(cloud_file2, label_file2);
+    // 计算相似度得分
     auto score = getScore(cloudl1, cloudl2, angle, diff_x, diff_y);
     return score;
 }
