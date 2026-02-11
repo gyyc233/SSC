@@ -4,24 +4,31 @@ SSC::SSC(std::string conf_file)
 {
     auto data_cfg = YAML::LoadFile(conf_file);
     show = data_cfg["show"].as<bool>();
-    remap = data_cfg["remap"].as<bool>();
+    remap = data_cfg["remap"].as<bool>(); // 是否重新映射标签
     if (show)
     {
         viewer.reset(new pcl::visualization::CloudViewer("viewer"));
     }
     rotate = data_cfg["rotate"].as<bool>();
     occlusion = data_cfg["occlusion"].as<bool>();
+
+    // 随机初始化
     gettimeofday(&time_t, nullptr);
     random_generator.reset(new std::default_random_engine(time_t.tv_usec));
     random_distribution.reset(new std::uniform_int_distribution<int>(-18000, 18000));
-    auto color_map = data_cfg["color_map"];
+
+    // 将 learning_map 中的对应关系存入 label_map 数组
     learning_map = data_cfg["learning_map"];
     label_map.resize(260);
     for (auto it = learning_map.begin(); it != learning_map.end(); ++it)
     {
         label_map[it->first.as<int>()] = it->second.as<int>();
     }
+
+
     YAML::const_iterator it;
+    // 读取每个语义标签对应的 RGB 颜色
+    auto color_map = data_cfg["color_map"]; // 每个语义标签对应的rgb颜色映射
     for (it = color_map.begin(); it != color_map.end(); ++it)
     {
         // Get label and key
@@ -32,6 +39,8 @@ SSC::SSC(std::string conf_file)
             static_cast<u_char>(color_map[key][2].as<unsigned int>()));
         _color_map[key] = color;
     }
+
+    // 反向颜色映射 在生成 2D 描述符图像时，可以根据这个 map 直接渲染出彩色的语义图
     auto learning_class = data_cfg["learning_map_inv"];
     for (it = learning_class.begin(); it != learning_class.end(); ++it)
     {
@@ -115,6 +124,7 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
     in_cloud.close();
     return re_cloud;
 }
+
 pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud)
 {
     pcl::PointCloud<pcl::PointXYZL>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZL>);

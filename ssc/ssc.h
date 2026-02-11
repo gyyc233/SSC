@@ -15,19 +15,19 @@
 class SSC
 {
 private:
-    std::vector<int> order_vec = {0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 11, 12, 13, 15, 16, 14, 17, 9, 18, 19};
+    std::vector<int> order_vec = {0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 11, 12, 13, 15, 16, 14, 17, 9, 18, 19}; // 语义优先级
     typedef std::tuple<u_char, u_char, u_char> Color;
     std::map<uint32_t, Color> _color_map, _argmax_to_rgb;
     YAML::Node learning_map;
-    std::vector<int> label_map;
-    double max_dis=50;
+    std::vector<int> label_map; // 语义标签映射
+    double max_dis=50; // 激光有效范围
     double min_dis=5;
-    int rings=24;
-    int sectors=360;
+    int rings=24; // 极坐标网格径向划分数量
+    int sectors=360; // 极坐标网格方位角划分数量
     int sectors_range=360;
-    bool rotate=false;
-    bool occlusion=false;
-    bool remap=true;
+    bool rotate=false; // 数据增强旋转
+    bool occlusion=false; // 遮挡处理
+    bool remap=true; // 是否重新映射标签
     std::shared_ptr<std::default_random_engine> random_generator;
     std::shared_ptr<std::uniform_int_distribution<int> > random_distribution;
     struct timeval time_t;

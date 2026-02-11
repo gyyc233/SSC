@@ -13,11 +13,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 14)
 include_directories(./)
 add_subdirectory(ssc)
-add_executable(eval_pair eval_pair.cpp)
+add_executable(eval_pair eval_pair.cpp) # 成对点云评估
 target_link_libraries(eval_pair ssc)
-add_executable(eval_seq eval_seq.cpp)
+add_executable(eval_seq eval_seq.cpp) # 序列评估
 target_link_libraries(eval_seq ssc)
-add_executable(eval_angle eval_angle.cpp)
+add_executable(eval_angle eval_angle.cpp) # 偏航角评估
 target_link_libraries(eval_angle ssc)
 add_executable(eval_top1 eval_top1.cpp)
 target_link_libraries(eval_top1 ssc)
