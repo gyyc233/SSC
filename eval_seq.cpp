@@ -2,7 +2,11 @@
 #include <string>
 #include <yaml-cpp/yaml.h>
 #include "ssc.h"
+
+// 该文件用于PR曲线的序列评估
+
 void zfill(std::string& in_str,int len){
+    // 若帧号不足len位，则补齐0
         while (in_str.size() < len)
         {
             in_str = "0" + in_str;
@@ -16,7 +20,7 @@ int main(int argc,char** argv){
     auto data_cfg = YAML::LoadFile(conf_file);
     auto cloud_path=data_cfg["eval_seq"]["cloud_path"].as<std::string>();
     auto label_path=data_cfg["eval_seq"]["label_path"].as<std::string>();
-    auto pairs_file=data_cfg["eval_seq"]["pairs_file"].as<std::string>();
+    auto pairs_file=data_cfg["eval_seq"]["pairs_file"].as<std::string>(); // 帧对列表文件
     auto out_file=data_cfg["eval_seq"]["out_file"].as<std::string>();
     auto file_name_length=data_cfg["file_name_length"].as<int>();
     SSC ssc(conf_file);
@@ -27,6 +31,7 @@ int main(int argc,char** argv){
     {
         std::string sequ1, sequ2;
         int label;
+        // pairs_file 格式：sequ1 sequ2 label 0 表示负样本（不同位置），1 表示正样本（同位置/回环）
         f_pairs >> sequ1;
         f_pairs >> sequ2;
         f_pairs >> label;
@@ -52,7 +57,7 @@ int main(int argc,char** argv){
         // std::cout <<num<< " " << angle*180./M_PI<<" "<<diff_x<<" "<<diff_y << " " << score << " " << label << std::endl;
         Eigen::Matrix4f transform;
         auto score=ssc.getScore(cloud_file1,cloud_file2,sem_file1,sem_file2,transform);//refine angle
-        f_out << score << " " << label << std::endl;
+        f_out << score << " " << label << std::endl; // 分数 真值(0/1)
         std::cout<<num<<" "<<score<<" "<<label<<std::endl;
         num++;
     }

@@ -32,26 +32,35 @@ int main(int argc, char **argv)
     std::istream_iterator<float> start(f_pose), end;
     std::vector<float> pose_temp(start, end);
     std::vector<std::tuple<float, float>> poses;
+
     for (size_t i = 0; i < pose_temp.size(); i += 12)
     {
         poses.emplace_back(std::make_tuple(pose_temp[i + 3], pose_temp[i + 11]));
     }
+
+    // 从第51帧开始，遍历每一帧
     for (size_t i = 51; i < poses.size(); ++i)
     {
         std::cout<<i<<"/"<<poses.size()<<std::endl;
         auto posei = poses[i];
         std::vector<int> match_id;
+
+        // 遍历前50帧，计算与当前帧的距离
         for (size_t j = 0; j < i - 50; ++j)
         {
             auto posej = poses[j];
             auto dis = std::sqrt((std::get<1>(posei) - std::get<1>(posej)) * (std::get<1>(posei) - std::get<1>(posej)) + (std::get<0>(posei) - std::get<0>(posej)) * (std::get<0>(posei) - std::get<0>(posej)));
+            
+            // 若距离小于5米，则认为匹配成功
             if (dis <= 5)
             {
                 match_id.emplace_back(j);
             }
         }
+
         if (!match_id.empty())
         {
+            // 若匹配成功，则计算相似度得分
             std::vector<std::tuple<float, int> > scores;
             for (size_t j = 0; j < i - 50; ++j)
             {
@@ -77,6 +86,8 @@ int main(int argc, char **argv)
                 auto score=ssc.getScore(cloud_file1,cloud_file2,sem_file1,sem_file2,transform);
                 scores.emplace_back(std::make_tuple(score,j));
             }
+
+            // 取得分最高的前25的帧保存
             std::sort(scores.begin(),scores.end(),cmp);
             int num=std::min(25,(int)scores.size());
             f_out<<i;

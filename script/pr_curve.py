@@ -3,9 +3,9 @@ from sklearn import  metrics
 from matplotlib import pyplot as plt
 import os
 def eval(file,out_path):
-    db=np.genfromtxt(os.path.join(out_path,file+".txt"))
+    db=np.genfromtxt(os.path.join(out_path,file+".txt")) # 读取整份数据
     db=np.nan_to_num(db)
-    precision, recall, pr_thresholds = metrics.precision_recall_curve(db[:,1], db[:,0])
+    precision, recall, pr_thresholds = metrics.precision_recall_curve(db[:,1], db[:,0]) # 真实标签 db[:,1]，预测分数 db[:,0]
     plt.plot(recall, precision, color='darkorange',lw=2, label='P-R curve')
     plt.axis([0,1,0,1])
     plt.xlabel('Recall')
