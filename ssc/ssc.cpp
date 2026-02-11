@@ -1,13 +1,17 @@
 #include "ssc.h"
 #include "pcl/impl/point_types.hpp"
+#include "pcl/io/ply_io.h"
+#include <sys/stat.h>
+#include <cstdlib>
 SSC::SSC(std::string conf_file)
 {
     auto data_cfg = YAML::LoadFile(conf_file);
     show = data_cfg["show"].as<bool>();
     remap = data_cfg["remap"].as<bool>(); // 是否重新映射标签
+    show_save_dir_ = data_cfg["show_save_dir"] ? data_cfg["show_save_dir"].as<std::string>() : "../out/show";
     if (show)
     {
-        viewer.reset(new pcl::visualization::CloudViewer("viewer"));
+        // viewer.reset(new pcl::visualization::CloudViewer("viewer"));
     }
     rotate = data_cfg["rotate"].as<bool>();
     occlusion = data_cfg["occlusion"].as<bool>();
@@ -79,6 +83,8 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
     
     // re_cloud 的点数设为 num_points，后面按索引往里填坐标和标签
     re_cloud->points.resize(num_points);
+    re_cloud->width = num_points;
+    re_cloud->height = 1;
 
     float random_angle = 0, max_angle = 0;
     float cs = 1, ss = 0;
@@ -404,7 +410,7 @@ void SSC::globalICP(cv::Mat &ssc_dis1, cv::Mat &ssc_dis2, double &angle, float &
         {
             temp_cloud->height = 1;
             temp_cloud->width = temp_cloud->points.size();
-            viewer->showCloud(temp_cloud);
+            // viewer->showCloud(temp_cloud);
             usleep(1000000);
         }
 
@@ -542,12 +548,25 @@ double SSC::getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointClou
         auto color_cloud1 = getColorCloud(cloud1);
         auto color_cloud2 = getColorCloud(trans_cloud);
         *color_cloud2 += *color_cloud1;
-        viewer->showCloud(color_cloud2);
+        // viewer->showCloud(color_cloud2);
         auto color_image1 = getColorImage(desc1);
-        cv::imshow("color image1", color_image1);
         auto color_image2 = getColorImage(desc2);
-        cv::imshow("color image2", color_image2);
-        cv::waitKey(0);
+        // cv::imshow("color image1", color_image1);
+        // cv::imshow("color image2", color_image2);
+        // 保存点云与 SSC
+        if (!show_save_dir_.empty())
+        {
+            std::string mkdir_cmd = "mkdir -p " + show_save_dir_;
+            if (std::system(mkdir_cmd.c_str()) == 0)
+            {
+                std::string ply_path = show_save_dir_ + "/cloud_merged.ply";
+                if (!color_cloud2->points.empty())
+                    pcl::io::savePLYFileBinary(ply_path, *color_cloud2);
+                cv::imwrite(show_save_dir_ + "/ssc1.png", color_image1);
+                cv::imwrite(show_save_dir_ + "/ssc2.png", color_image2);
+            }
+        }
+        // cv::waitKey(0);
     }
 
     return score;
@@ -567,15 +586,38 @@ double SSC::getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointClou
     {
         transform(2,3)=0.;
         transformPointCloud(*cloud2, *trans_cloud, transform);
+
         auto color_cloud1 = getColorCloud(cloud1);
+        auto origin_color_cloud2 = getColorCloud(cloud2);
+
+        std::string ply_path_origin_cloud1 = show_save_dir_ + "/origin_color_cloud1.ply";
+        std::string ply_path_origin_cloud2 = show_save_dir_ + "/origin_color_cloud2.ply";
+        if (!color_cloud1->points.empty() && !origin_color_cloud2->points.empty()){
+            pcl::io::savePLYFileBinary(ply_path_origin_cloud1, *color_cloud1);
+            pcl::io::savePLYFileBinary(ply_path_origin_cloud2, *origin_color_cloud2);
+        }
+
         auto color_cloud2 = getColorCloud(trans_cloud);
         *color_cloud2 += *color_cloud1;
-        viewer->showCloud(color_cloud2);
+        // viewer->showCloud(color_cloud2);
         auto color_image1 = getColorImage(desc1);
-        cv::imshow("color image1", color_image1);
         auto color_image2 = getColorImage(desc2);
-        cv::imshow("color image2", color_image2);
-        cv::waitKey(0);
+        // cv::imshow("color image1", color_image1);
+        // cv::imshow("color image2", color_image2);
+        // 保存点云与 SSC
+        if (!show_save_dir_.empty())
+        {
+            std::string mkdir_cmd = "mkdir -p " + show_save_dir_;
+            if (std::system(mkdir_cmd.c_str()) == 0)
+            {
+                std::string ply_path = show_save_dir_ + "/cloud_merged.ply";
+                if (!color_cloud2->points.empty())
+                    pcl::io::savePLYFileBinary(ply_path, *color_cloud2);
+                cv::imwrite(show_save_dir_ + "/ssc1.png", color_image1);
+                cv::imwrite(show_save_dir_ + "/ssc2.png", color_image2);
+            }
+        }
+        // cv::waitKey(0);
     }
     return score;
 }

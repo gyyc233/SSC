@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <string>
 #include <opencv2/opencv.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -32,6 +33,7 @@ private:
     std::shared_ptr<std::uniform_int_distribution<int> > random_distribution;
     struct timeval time_t;
     bool show=false;
+    std::string show_save_dir_;  // show 为 true 时保存点云 PLY 与 SSC 图像的目录
     std::shared_ptr<pcl::visualization::CloudViewer> viewer;
     int fastAtan2(float y,float x);
 public:

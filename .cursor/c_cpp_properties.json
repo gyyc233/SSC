@@ -1,0 +1,24 @@
+{
+  "configurations": [
+      {
+          "name": "Linux",
+          "includePath": [
+              "${workspaceFolder}/**",
+              "${workspaceFolder}/Thirdparty/nanoflann",
+              "/usr/local/include",
+              "/usr/include/pcl-1.12",
+              "/usr/local/include/g2o",
+              "/usr/local/include/octovis",
+              "/usr/include",
+              "/usr/local/include/opencv4/opencv2",
+              "/usr/include/eigen3",
+              "/opt/ros/humble/include"
+          ],
+          "compilerPath": "/usr/bin/gcc",
+          "cStandard": "c17",
+          "cppStandard": "gnu++17",
+          "intelliSenseMode": "linux-gcc-x64"
+      }
+  ],
+  "version": 4
+}
