@@ -11,11 +11,13 @@ int main(){
     auto label_file1=data_cfg["eval_pair"]["label_file1"].as<std::string>();
     auto label_file2=data_cfg["eval_pair"]["label_file2"].as<std::string>();
     SSC ssc(conf_file);
+
     // double angle = 0;
     // float diff_x=0, diff_y=0;
-    // auto score=ssc.getScore(cloud_file1,cloud_file2,label_file1,label_file2,angle,diff_x,diff_y);
-    // std::cout<<"score:"<<score<<std::endl;
+    // auto score_iter_xy=ssc.getScore(cloud_file1,cloud_file2,label_file1,label_file2,angle,diff_x,diff_y);
+    // std::cout<<"score_iter_xy:"<<score_iter_xy<<std::endl;
     // std::cout<<"(x,y,yaw): ("<<diff_x<<", "<<diff_y<<", "<<angle*180./M_PI<<")"<<std::endl;
+
     Eigen::Matrix4f transform;
     auto score=ssc.getScore(cloud_file1,cloud_file2,label_file1,label_file2,transform);//refine angle
     std::cout<<"score:"<<score<<std::endl;

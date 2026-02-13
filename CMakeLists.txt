@@ -3,7 +3,7 @@ project(SSC)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CONFIGURATION_TYPES Debug RelWithDebInfo Release)
 set(CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -Wall -O3 -march=native")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -pg -march=native")
@@ -17,6 +17,16 @@ add_executable(eval_pair eval_pair.cpp) # 成对点云评估
 target_link_libraries(eval_pair ssc)
 add_executable(eval_seq eval_seq.cpp) # 序列评估
 target_link_libraries(eval_seq ssc)
+
+add_executable(eval_loopclosure eval_loopclosure.cpp) # 全量点云回环检测
+target_link_libraries(eval_loopclosure ssc)
+
+add_executable(eval_loopclosure_origin_single eval_loopclosure_origin_single.cpp) # 全量点云投影2D 回环检测
+target_link_libraries(eval_loopclosure_origin_single ssc)
+
+add_executable(eval_loopclosure_origin_single_scale eval_loopclosure_origin_single_scale.cpp) # 全量点云投影2D 回环检测
+target_link_libraries(eval_loopclosure_origin_single_scale ssc)
+
 add_executable(eval_angle eval_angle.cpp) # 偏航角评估
 target_link_libraries(eval_angle ssc)
 add_executable(eval_top1 eval_top1.cpp)

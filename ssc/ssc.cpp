@@ -4,7 +4,7 @@
 #include <sys/stat.h>
 #include <cstdlib>
 SSC::SSC(std::string conf_file)
-{
+{ 
     auto data_cfg = YAML::LoadFile(conf_file);
     show = data_cfg["show"].as<bool>();
     remap = data_cfg["remap"].as<bool>(); // 是否重新映射标签
@@ -147,6 +147,84 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud(std::string file_cloud, std:
         re_cloud->points[i].z = values_cloud[4 * i + 2];
         re_cloud->points[i].label = sem_label;
     }
+    return re_cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud2(std::string file_cloud, std::string file_label, bool fixed_z, int down_sample_num, float scale)
+{
+    pcl::PointCloud<pcl::PointXYZL>::Ptr re_cloud(new pcl::PointCloud<pcl::PointXYZL>()); // 新建空的带语义标签点云
+
+    // 打开标签文件
+    std::ifstream in_label(file_label, std::ios::binary); 
+    if (!in_label.is_open())
+    {
+        std::cerr << "No file:" << file_label << std::endl;
+        exit(-1);
+    }
+
+    in_label.seekg(0, std::ios::end);
+    uint32_t num_points = in_label.tellg() / sizeof(uint32_t); // 标签文件大小/uint32_t大小 = 点云数量
+    in_label.seekg(0, std::ios::beg);
+    std::vector<uint32_t> values_label(num_points);
+    in_label.read((char *)&values_label[0], num_points * sizeof(uint32_t)); // 把整份标签读取到values_label中
+
+    // 打开点云文件
+    std::ifstream in_cloud(file_cloud, std::ios::binary);
+    std::vector<float> values_cloud(4 * num_points);
+    // 按点云每点 4 个 float 把整帧读进 values_cloud
+    in_cloud.read((char *)&values_cloud[0], 4 * num_points * sizeof(float));
+    
+    uint32_t step = down_sample_num; // 既然你定义的 down_sample 是 /4，那么步长就是 4
+    uint32_t down_sample = num_points / step;
+
+    // re_cloud->points.resize(down_sample);
+    // re_cloud->width = down_sample;
+    // re_cloud->height = 1;
+
+    uint32_t count = 0; // 存入新点云的独立计数器
+    pcl::PointXYZL l_point;
+    for (uint32_t i = 0; i < num_points && count < down_sample; i += step)
+    {
+        uint32_t sem_label;
+        uint32_t raw_id = values_label[i] & 0x0000ffff;
+
+        // 再次提醒：必须检查 label_map 边界
+        if (remap && raw_id < label_map.size()) {
+            sem_label = label_map[raw_id];
+        } else {
+            sem_label = remap ? 0 : values_label[i];
+        }
+
+        if(fixed_z){
+            if(values_cloud[4 * i + 2] < -1 || values_cloud[4 * i + 2] > -0.5){
+                continue;
+            }
+        }
+
+        // 将数据填入 count 指向的位置，而不是 i
+        if (sem_label == 0) {
+            l_point.x = 0;
+            l_point.y = 0;
+            l_point.z = 0;
+            l_point.label = 0;
+        } else {
+            l_point.x = values_cloud[4 * i] * scale;
+            l_point.y = values_cloud[4 * i + 1] * scale;
+            if(fixed_z){
+                l_point.z = 0;
+            }
+            else{
+                l_point.z = values_cloud[4 * i + 2] * scale;
+            }
+            l_point.label = sem_label;
+        }
+        re_cloud->points.push_back(l_point);
+        count++; // 每次处理完一个采样点，移动目标指针
+    }
+
+    re_cloud->width = re_cloud->points.size();
+    re_cloud->height = 1;
+    std::cout<<"re_cloud size: "<<re_cloud->points.size()<<std::endl;
     return re_cloud;
 }
 
@@ -632,10 +710,10 @@ double SSC::getScore(std::string cloud_file1, std::string cloud_file2, std::stri
     return score;
 }
 
-double SSC::getScore(std::string cloud_file1, std::string cloud_file2, std::string label_file1, std::string label_file2, Eigen::Matrix4f& transform)
+double SSC::getScore(std::string cloud_file1, std::string cloud_file2, std::string label_file1, std::string label_file2, Eigen::Matrix4f& transform, bool fixed_z, int down_sample_num, float scale)
 {
-    auto cloudl1 = getLCloud(cloud_file1, label_file1);
-    auto cloudl2 = getLCloud(cloud_file2, label_file2);
+    auto cloudl1 = getLCloud2(cloud_file1, label_file1, fixed_z, down_sample_num, scale);
+    auto cloudl2 = getLCloud2(cloud_file2, label_file2, fixed_z, down_sample_num, scale);
     auto score = getScore(cloudl1, cloudl2, transform);
     return score;
 }

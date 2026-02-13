@@ -5,7 +5,7 @@ import os
 
 # 用 KITTI 位姿 为指定序列生成正样本对和负样本对的索引
 
-def run(seq='00',folder="/media/l/yp2/KITTI/odometry/dataset/poses/"):
+def run(seq='05',folder="/home/bot/ros_ws/data/poses/"):
     pose_file=os.path.join(folder,seq+".txt")
     poses=np.genfromtxt(pose_file)
     poses=poses[:,[3,11]] # 读取序列文件每帧的 x y
@@ -31,4 +31,4 @@ if __name__=='__main__':
     seq="05"
     if len(sys.argv)>1:
         seq=sys.argv[1]
-    run(seq,"/media/l/yp2/KITTI/odometry/dataset/poses/")
+    run(seq,"/home/bot/ros_ws/data/poses/")

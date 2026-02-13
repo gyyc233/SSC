@@ -40,7 +40,7 @@ public:
     SSC(std::string conf_file);
     ~SSC();
     double getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointCloud<pcl::PointXYZL>::Ptr cloud2, Eigen::Matrix4f& trans);
-    double getScore(std::string cloud_file1, std::string cloud_file2, std::string label_file1, std::string label_file2, Eigen::Matrix4f& transform);
+    double getScore(std::string cloud_file1, std::string cloud_file2, std::string label_file1, std::string label_file2, Eigen::Matrix4f& transform, bool fixed_z = false, int down_sample_num = 1, float scale = 1.0f);
     double getScore(std::string cloud_file1, std::string cloud_file2, Eigen::Matrix4f& transform);
     double getScore(pcl::PointCloud<pcl::PointXYZL>::Ptr cloud1, pcl::PointCloud<pcl::PointXYZL>::Ptr cloud2, double &angle,float& diff_x,float& diff_y);
     double getScore(std::string cloud_file1,std::string cloud_file2,std::string label_file1,std::string label_file2,double &angle,float& diff_x,float& diff_y);
@@ -48,6 +48,8 @@ public:
 
     // 从 KITTI 格式 的一帧数据里，读出带语义标签的点云（PointXYZL），并可按配置做 标签重映射 和 数据增强（旋转、遮挡）
     pcl::PointCloud<pcl::PointXYZL>::Ptr getLCloud(std::string file_cloud, std::string file_label);
+
+    pcl::PointCloud<pcl::PointXYZL>::Ptr getLCloud2(std::string file_cloud, std::string file_label, bool fixed_z = false, int down_sample_num = 1, float scale = 1.0f);
 
     // 加载带标签的点云
     pcl::PointCloud<pcl::PointXYZL>::Ptr getLCloud(std::string file_cloud);
