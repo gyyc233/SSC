@@ -13,8 +13,24 @@ SSC::SSC(std::string conf_file)
     {
         // viewer.reset(new pcl::visualization::CloudViewer("viewer"));
     }
+
+    sectors = data_cfg["ssc_params"]["sectors_num"].as<int>();
+    rings = data_cfg["ssc_params"]["rings_num"].as<int>();
+    min_dis = data_cfg["ssc_params"]["min_dis"].as<double>();
+    max_dis = data_cfg["ssc_params"]["max_dis"].as<double>();
+
     rotate = data_cfg["rotate"].as<bool>();
     occlusion = data_cfg["occlusion"].as<bool>();
+
+    std::cout<<"SSC prams show: "<<show<<std::endl;
+    std::cout<<"SSC prams remap: "<<remap<<std::endl;
+    std::cout<<"SSC prams sectors: "<<sectors<<std::endl;
+    std::cout<<"SSC prams rings: "<<rings<<std::endl;
+    std::cout<<"SSC prams min_dis: "<<min_dis<<std::endl;
+    std::cout<<"SSC prams max_dis: "<<max_dis<<std::endl;
+    std::cout<<"SSC prams rotate: "<<rotate<<std::endl;
+    std::cout<<"SSC prams occlusion: "<<occlusion<<std::endl;
+
 
     // 随机初始化
     gettimeofday(&time_t, nullptr);
@@ -174,7 +190,7 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud2(std::string file_cloud, std
     // 按点云每点 4 个 float 把整帧读进 values_cloud
     in_cloud.read((char *)&values_cloud[0], 4 * num_points * sizeof(float));
     
-    uint32_t step = down_sample_num; // 既然你定义的 down_sample 是 /4，那么步长就是 4
+    uint32_t step = down_sample_num;
     uint32_t down_sample = num_points / step;
 
     // re_cloud->points.resize(down_sample);
@@ -224,7 +240,7 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr SSC::getLCloud2(std::string file_cloud, std
 
     re_cloud->width = re_cloud->points.size();
     re_cloud->height = 1;
-    std::cout<<"re_cloud size: "<<re_cloud->points.size()<<std::endl;
+    // std::cout<<"re_cloud size: "<<re_cloud->points.size()<<std::endl;
     return re_cloud;
 }
 

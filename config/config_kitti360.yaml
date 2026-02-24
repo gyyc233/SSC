@@ -2,6 +2,13 @@
 show: false
 remap: false
 file_name_length: 10
+
+ssc_params:
+  sectors_num: 360
+  rings_num: 24
+  min_dis: 5
+  max_dis: 50
+
 eval_pair:
   cloud_file1: "/media/l/yp2/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/velodyne_points/data/0000004863.bin"
   cloud_file2: "/media/l/yp2/KITTI-360/data_3d_raw/2013_05_28_drive_0000_sync/velodyne_points/data/0000004528.bin"

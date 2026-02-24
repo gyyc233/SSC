@@ -20,7 +20,7 @@ void zfill(std::string& in_str,int len){
         }
 }
 int main(int argc,char** argv){
-    std::string conf_file="../config/config_kitti_origin_single.yaml";
+    std::string conf_file="../config/config_kitti_origin_single_scale.yaml";
     if(argc>1){
         conf_file=argv[1];
     }
@@ -28,7 +28,6 @@ int main(int argc,char** argv){
     auto cloud_path=data_cfg["eval_loopclosure"]["cloud_path"].as<std::string>();
     auto label_path=data_cfg["eval_loopclosure"]["label_path"].as<std::string>();
     auto out_file=data_cfg["eval_loopclosure"]["out_file"].as<std::string>();
-    auto file_name_length=data_cfg["file_name_length"].as<int>();
 
     std::ofstream result_file;
         result_file.open(out_file, std::ios::out);
@@ -85,10 +84,10 @@ int main(int argc,char** argv){
         }
 
         float scale = 0.1f;
+        int down_sample_num = 30;
         for(int j =j_min; j<j_max;j+=1){
             Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-            double score=ssc.getScore(cloud_files[i],cloud_files[j],sem_files[i],sem_files[j],transform, true, 60,scale);
-            return 0;
+            double score=ssc.getScore(cloud_files[i],cloud_files[j],sem_files[i],sem_files[j],transform, true, down_sample_num,scale);
 
             if(score > max_score){
                 max_score = score;
@@ -103,7 +102,7 @@ int main(int argc,char** argv){
         }
 
         if (result_file.is_open() && max_score !=0) {        
-            if(max_score < 0.7){
+            if(max_score < 0.3){
                 best_match_id = -1;
             }
 

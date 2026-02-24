@@ -24,7 +24,7 @@ target_link_libraries(eval_loopclosure ssc)
 add_executable(eval_loopclosure_origin_single eval_loopclosure_origin_single.cpp) # 全量点云投影2D 回环检测
 target_link_libraries(eval_loopclosure_origin_single ssc)
 
-add_executable(eval_loopclosure_origin_single_scale eval_loopclosure_origin_single_scale.cpp) # 全量点云投影2D 回环检测
+add_executable(eval_loopclosure_origin_single_scale eval_loopclosure_origin_single_scale.cpp) # 全量点云投影2D然后缩放，模拟室内环境 回环检测
 target_link_libraries(eval_loopclosure_origin_single_scale ssc)
 
 add_executable(eval_angle eval_angle.cpp) # 偏航角评估

@@ -1,5 +1,5 @@
 # This file is covered by the LICENSE file in the root of this project.
-show: false
+show: true
 remap: true
 file_name_length: 6
 # 当 show 为 true 时，保存合并点云(PLY)与 SSC 图像到此目录
@@ -8,8 +8,8 @@ show_save_dir: "../out/show"
 ssc_params:
   sectors_num: 360
   rings_num: 24
-  min_dis: 5
-  max_dis: 50
+  min_dis: 0
+  max_dis: 5.0
 
 # 单对点云评估
 # eval_pair:
